@@ -1,24 +1,24 @@
 from flask import Flask
-from flask_restful import Resource, Api, reqparse
+from flask_restful import Resource, Api
 from influxdb import InfluxDBClient
 from datetime import datetime
-import io
-import re
 import os
 
 app = Flask(__name__)
 api = Api(app)
 
-host="influxdb.canair.io"
-dbname="canairio"
-client = InfluxDBClient(host=host, port=8086, database=dbname)
+host = os.environ.get("CANAIRIO_INFLUX_HOST")
+port = os.environ.get("CANAIRIO_INFLUX_PORT")
+dbname = os.environ.get("CANAIRIO_INFLUX_DBNAME")
+
+client = InfluxDBClient(host=host, port=port, database=dbname)
 
 def getMeasure(field, ftype, fvalue, funit):
   measure = {'measurementID': field['time']}
   measure['measurementType'] = ftype
   measure['measurementUnit'] = funit
   measure['measurementDeterminedDate '] = field['time'].format('YYYY-MM-DD HH:mm:ss')
-  measure['measurementDeterminedBy'] = 'CanAirIO'
+  measure['measurementDeterminedBy'] = 'CanAirIO'  # TODO: get from field
   try:
     measure['measurementValue'] = field['{}'.format(fvalue)]
   except Exception as e:
@@ -26,11 +26,12 @@ def getMeasure(field, ftype, fvalue, funit):
     measure['measurementValue'] = 0
   return measure
 
+
 def addStation(station, sdata):
-  response = { 'id': station }
-  response ['station_name'] = station
-  response ['scientificName'] = 'Air Quality'
-  response ['ownerInstitutionCodeProperty'] = 'CanAirIO'
+  response = {'id': station}
+  response['station_name'] = station
+  response['scientificName'] = 'Air Quality'
+  response['ownerInstitutionCodeProperty'] = 'CanAirIO'
   data = []
   ffirst = sdata[0]
   fend = sdata[0]
@@ -51,22 +52,21 @@ def addStation(station, sdata):
       data.append(getMeasure(s, 'Version', 'rev', ''))
       fend = s
       break
-  response ['measurements'] = data
+  response['measurements'] = data
   return response
+
 
 class Stations(Resource):
   def get(self):
     response = []
-    # client.query('select "pm25"::field,"U33TTGOTDA585E"::tag from "fixed_stations_01" where time >= now() - 1h')
-    rs = client.query('select distinct("name") from (select "pm25","name" from fixed_stations_01 where time>now()-10m)')
+    rs = client.query('select distinct("name") from (select "name" from fixed_stations_01 where time>now()-10m)')
     stations_names = [station['distinct'] for station in rs.get_points()]
-    rs = client.query('select * from fixed_stations_01 where time>now()-1h')
+    rs = client.query('select * from fixed_stations_01 where time>now()-10m')
     sdata = list(rs.get_points())
     for station in stations_names:
-      response.append(addStation(station,sdata))
-
-    # result = client.query('select * from "fixed_stations_01" WHERE time >= now() - 10m')
+      response.append(addStation(station, sdata))
     return response, 200  # return data and 200 OK code
+
 
 api.add_resource(Stations, '/stations')
 
