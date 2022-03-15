@@ -4,7 +4,7 @@ Initial API version for mobile and fixed CanAirIO stations
 
 ## Overview
 
-We have a JSON API for the CanAirIO fixed stations, for now it only has two endpoints, the first one for get all current stations that are online right now with the last publication, `stations` and the second one for retrieve the complete rawdata of each station.
+We have a JSON API for the CanAirIO fixed stations, for now it only has two endpoints, the first one for get all current stations that are online right now with the last publication, `stations` and the second one for retrieve the complete data of each station in the last hour. The output is a [DarwinCore](https://dwc.tdwg.org/terms/) record.
 
 ## Stations list
 
@@ -132,7 +132,7 @@ Sample output of one station only:
 
 ## Station data
 
-endpoint: [http://api.canair.io:8080/dwc/stations/station_id](http://api.canair.io:8080/stations/station_id)
+endpoint: [http://api.canair.io:8080/dwc/stations/station_id](http://api.canair.io:8080/dwc/stations/station_id)
 
 Request sample for station with id: U33TTGOTDA585E:  
 
