@@ -1,5 +1,5 @@
 from flask import Flask
-from flask_restful import Resource, Api
+from flask_restful import Resource, Api, abort, reqparse
 from influxdb import InfluxDBClient
 import pygeohash as pgh
 from datetime import datetime
@@ -7,12 +7,18 @@ import os
 
 app = Flask(__name__)
 api = Api(app)
+parser = reqparse.RequestParser()
+parser.add_argument('station_id')
 
 host = os.environ.get("CANAIRIO_INFLUX_HOST")
 port = os.environ.get("CANAIRIO_INFLUX_PORT")
 dbname = os.environ.get("CANAIRIO_INFLUX_DBNAME")
 
 client = InfluxDBClient(host=host, port=port, database=dbname)
+
+def abort_if_todo_doesnt_exist(stations, station_id):
+    if station_id not in stations:
+        abort(404, message="Station id {} doesn't exist".format(station_id))
 
 def getMeasure(field, ftype, fvalue, funit):
   """ Get a measure from a field
@@ -69,18 +75,27 @@ def addStation(station, sdata):
   response['observedOn'] = fend['time'].format('YYYY-MM-DD HH:mm:ss')
   coords = pgh.decode(fend['geo'])
   response['locationID'] = fend['time']
-  response['decimalLatitude '] = coords[0]
-  response['decimalLongitude '] = coords[1]
   response['georeferencedBy'] = 'CanAirIO firmware {}'.format(fend['rev'])
   response['georeferencedDate'] = fend['time'].format('YYYY-MM-DD HH:mm:ss')
+  response['decimalLatitude '] = coords[0]
+  response['decimalLongitude '] = coords[1]
   response['geohash'] = fend['geo']
   return response
 
+class Station(Resource):
+  def get(self, station_id):
+    rs = client.query('select distinct("name") from (select "name" from fixed_stations_01 where time>now()-1h)')
+    stations = [station['distinct'] for station in rs.get_points()]
+    abort_if_todo_doesnt_exist(stations, station_id)
+    rs = client.query('select * from "fixed_stations_01" where "name"=\'{}\' AND (time >= now() - 1d)'.format(station_id))
+    response = list(rs.get_points())
+    return response, 200 
 
 class Stations(Resource):
   def get(self):
     response = []
-    rs = client.query('select distinct("name") from (select "name" from fixed_stations_01 where time>now()-10m)')
+    rs = client.query(
+        'select distinct("name") from (select "name" from fixed_stations_01 where time>now()-10m)')
     stations_names = [station['distinct'] for station in rs.get_points()]
     rs = client.query('select * from fixed_stations_01 where time>now()-10m')
     sdata = list(rs.get_points())
@@ -90,6 +105,7 @@ class Stations(Resource):
 
 
 api.add_resource(Stations, '/stations')
+api.add_resource(Station, '/stations/<string:station_id>')
 
 if __name__ == '__main__':
   app.run(host="0.0.0.0")
