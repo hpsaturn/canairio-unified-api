@@ -13,6 +13,7 @@ parser.add_argument('station_id')
 host = os.environ.get("CANAIRIO_INFLUX_HOST")
 port = os.environ.get("CANAIRIO_INFLUX_PORT")
 dbname = os.environ.get("CANAIRIO_INFLUX_DBNAME")
+ftable = os.environ.get("CANAIRIO_INFLUX_FIXED_STATIONS_TABLE")
 
 client = InfluxDBClient(host=host, port=port, database=dbname)
 
@@ -39,12 +40,10 @@ def getMeasure(field, ftype, fvalue, funit):
     measure['measurementValue'] = 0
   return measure
 
-
-def addStation(station, sdata):
-  """ Add a station to API response
-  :param station: station name
-  :param sdata: all stations data
-  :return: station json data
+def getHeaderResponse(station):
+  """ Get header response
+  :param station: station name id
+  :return: header response
   """
   response = {'id': station}
   response['station_name'] = station
@@ -52,6 +51,30 @@ def addStation(station, sdata):
   response['ownerInstitutionCodeProperty'] = 'CanAirIO'
   response['type'] = 'PhysicalObject'
   response['license'] = 'CC BY-NC-SA'
+  return response 
+
+def getLocationInfo(field):
+  """ Get location info from field
+  :param field: field row data from influxdb
+  :return: location info response
+  """
+  response = {}
+  coords = pgh.decode(field['geo'])
+  response['locationID'] = field['time']
+  response['georeferencedBy'] = 'CanAirIO firmware {}'.format(field['rev'])
+  response['georeferencedDate'] = field['time'].format('YYYY-MM-DD HH:mm:ss')
+  response['decimalLatitude '] = coords[0]
+  response['decimalLongitude '] = coords[1]
+  response['geohash'] = field['geo']
+  return response
+
+def addStation(station, sdata):
+  """ Add a station to API response
+  :param station: station name
+  :param sdata: all stations data
+  :return: station json data
+  """
+  response = getHeaderResponse(station) 
   data = []
   fend = {}
   for s in sdata:
@@ -72,32 +95,29 @@ def addStation(station, sdata):
       fend = s
       break
   response['measurements'] = data
+  response['locations'] = getLocationInfo(fend) 
   response['observedOn'] = fend['time'].format('YYYY-MM-DD HH:mm:ss')
-  coords = pgh.decode(fend['geo'])
-  response['locationID'] = fend['time']
-  response['georeferencedBy'] = 'CanAirIO firmware {}'.format(fend['rev'])
-  response['georeferencedDate'] = fend['time'].format('YYYY-MM-DD HH:mm:ss')
-  response['decimalLatitude '] = coords[0]
-  response['decimalLongitude '] = coords[1]
-  response['geohash'] = fend['geo']
   return response
 
 class Station(Resource):
   def get(self, station_id):
-    rs = client.query('select distinct("name") from (select "name" from fixed_stations_01 where time>now()-1h)')
+    response = getHeaderResponse(station_id)
+    rs = client.query('select distinct("name") from (select "name" from {} where time>now()-1h)'.format(ftable))
     stations = [station['distinct'] for station in rs.get_points()]
     abort_if_todo_doesnt_exist(stations, station_id)
-    rs = client.query('select * from "fixed_stations_01" where "name"=\'{}\' AND (time >= now() - 1d)'.format(station_id))
-    response = list(rs.get_points())
+    rs = client.query('select * from {} where "name"=\'{}\' AND (time >= now() - 1d)'.format(ftable, station_id))
+    response['rawdata'] = list(rs.get_points())
+    field = response['rawdata'][0]
+    response['locations'] = getLocationInfo(field)
+    response['observedOn'] = field['time'].format('YYYY-MM-DD HH:mm:ss')
     return response, 200 
 
 class Stations(Resource):
   def get(self):
     response = []
-    rs = client.query(
-        'select distinct("name") from (select "name" from fixed_stations_01 where time>now()-10m)')
+    rs = client.query('select distinct("name") from (select "name" from {} where time>now()-10m)'.format(ftable))
     stations_names = [station['distinct'] for station in rs.get_points()]
-    rs = client.query('select * from fixed_stations_01 where time>now()-10m')
+    rs = client.query('select * from {} where time>now()-10m'.format(ftable))
     sdata = list(rs.get_points())
     for station in stations_names:
       response.append(addStation(station, sdata))
