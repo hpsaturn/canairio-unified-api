@@ -20,6 +20,7 @@ def abort_if_todo_doesnt_exist(stations, station_id):
     if station_id not in stations:
         abort(404, message="Station id {} doesn't exist".format(station_id))
 
+
 def getMeasure(field, ftype, fvalue, funit):
   """ Get a measure from a field
   :param field: complete field row data from influxdb
@@ -39,9 +40,11 @@ def getMeasure(field, ftype, fvalue, funit):
     measure['measurementValue'] = 0
   return measure
 
+
 def getHeaderResponse(station, type='FixedStation'):
   """ Get header response
   :param station: station name id
+  :param type: station type (FixedStation or MobileStation)
   :return: header response
   """
   response = {'id': station}
@@ -51,10 +54,12 @@ def getHeaderResponse(station, type='FixedStation'):
   response['type'] = type
   response['license'] = 'CC BY-NC-SA'
   return response 
+  
 
 def getLocationInfo(field, response={}):
   """ Get location info from field
   :param field: field row data from influxdb
+  :param response: initial response body
   :return: location info response
   """
   coords = pgh.decode(field['geo'])
@@ -66,7 +71,15 @@ def getLocationInfo(field, response={}):
   response['geohash'] = field['geo']
   return response
 
+
 def getMeasurements(station, sdata, response={}, unique=True):
+  """ Get measurements from a station
+  :param station: station name id
+  :param sdata: stations data
+  :param response: initial response body
+  :param unique: if True, only the first measure are returned
+  :return: measurements response
+  """
   response['measurements'] = []
   fend = {}
   for s in sdata:
@@ -91,6 +104,7 @@ def getMeasurements(station, sdata, response={}, unique=True):
         break
   return fend
 
+
 def addStation(station, sdata):
   """ Add a station to API response
   :param station: station name
@@ -102,6 +116,7 @@ def addStation(station, sdata):
   getLocationInfo(fend, response)
   response['observedOn'] = fend['time'].format('YYYY-MM-DD HH:mm:ss')
   return response
+
 
 class Station(Resource):
   def get(self, station_id):
@@ -115,6 +130,7 @@ class Station(Resource):
     getLocationInfo(fend, response)
     response['observedOn'] = fend['time'].format('YYYY-MM-DD HH:mm:ss')
     return response, 200 
+
 
 class Stations(Resource):
   def get(self):
