@@ -8,7 +8,7 @@ We have a JSON API for the CanAirIO fixed stations, for now it only has two endp
 
 ## Stations list
 
-endpoint: `http://api.canair.io:8080/dwc/stations`  
+endpoint: [http://api.canair.io:8080/dwc/stations](http://api.canair.io:8080/dwc/stations)
 
 Sample request for retreive all stations:
 
@@ -132,7 +132,7 @@ Sample output of one station only:
 
 ## Station data
 
-endpoint: `http://api.canair.io:8080/stations/station_id`  
+endpoint: [http://api.canair.io:8080/stations/station_id](http://api.canair.io:8080/stations/station_id)
 
 Request sample for station with id: U33TTGOTDA585E:  
 
