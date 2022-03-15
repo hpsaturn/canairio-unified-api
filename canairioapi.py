@@ -2,7 +2,6 @@ from flask import Flask
 from flask_restful import Resource, Api, abort, reqparse
 from influxdb import InfluxDBClient
 import pygeohash as pgh
-from datetime import datetime
 import os
 
 app = Flask(__name__)
@@ -124,7 +123,7 @@ class Stations(Resource):
     return response, 200  # return data and 200 OK code
 
 
-api.add_resource(Stations, '/stations')
+api.add_resource(Stations, '/stations', '/stations/')
 api.add_resource(Station, '/stations/<string:station_id>')
 
 if __name__ == '__main__':
