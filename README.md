@@ -132,12 +132,12 @@ Sample output of one station only:
 
 ## Station data
 
-endpoint: [http://api.canair.io:8080/stations/station_id](http://api.canair.io:8080/stations/station_id)
+endpoint: [http://api.canair.io:8080/dwc/stations/station_id](http://api.canair.io:8080/stations/station_id)
 
 Request sample for station with id: U33TTGOTDA585E:  
 
 ```bash
-curl -G http://api.canair.io:8080/stations/U33TTGOTDA585E
+curl -G http://api.canair.io:8080/dwc/stations/U33TTGOTDA585E
 ```
 
 Sample output for this station:

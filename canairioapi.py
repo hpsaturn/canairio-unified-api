@@ -106,10 +106,10 @@ def addStation(station, sdata):
 class Station(Resource):
   def get(self, station_id):
     response = getHeaderResponse(station_id)
-    rs = client.query('select distinct("name") from (select "name" from {} where time>now()-1h)'.format(ftable))
+    rs = client.query('select distinct("name") from (select "name" from {} where time>now()-10m)'.format(ftable))
     stations = [station['distinct'] for station in rs.get_points()]
     abort_if_todo_doesnt_exist(stations, station_id)
-    rs = client.query('select * from {} where "name"=\'{}\' AND (time >= now() - 1d)'.format(ftable, station_id))
+    rs = client.query('select * from {} where "name"=\'{}\' AND (time >= now() - 1h)'.format(ftable, station_id))
     sdata = list(rs.get_points())
     fend = getMeasurements(station_id, sdata, response, False)
     getLocationInfo(fend, response)
