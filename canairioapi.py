@@ -39,25 +39,24 @@ def getMeasure(field, ftype, fvalue, funit):
     measure['measurementValue'] = 0
   return measure
 
-def getHeaderResponse(station):
+def getHeaderResponse(station, type='FixedStation'):
   """ Get header response
   :param station: station name id
   :return: header response
   """
   response = {'id': station}
   response['station_name'] = station
-  response['scientificName'] = 'Air quality fixed station'
+  response['scientificName'] = 'CanAirIO Air quality Station'
   response['ownerInstitutionCodeProperty'] = 'CanAirIO'
-  response['type'] = 'PhysicalObject'
+  response['type'] = type
   response['license'] = 'CC BY-NC-SA'
   return response 
 
-def getLocationInfo(field):
+def getLocationInfo(field, response={}):
   """ Get location info from field
   :param field: field row data from influxdb
   :return: location info response
   """
-  response = {}
   coords = pgh.decode(field['geo'])
   response['locationID'] = field['time']
   response['georeferencedBy'] = 'CanAirIO firmware {}'.format(field['rev'])
@@ -67,17 +66,12 @@ def getLocationInfo(field):
   response['geohash'] = field['geo']
   return response
 
-def addStation(station, sdata):
-  """ Add a station to API response
-  :param station: station name
-  :param sdata: all stations data
-  :return: station json data
-  """
-  response = getHeaderResponse(station) 
-  data = []
+def getMeasurements(station, sdata, response={}, unique=True):
+  response['measurements'] = []
   fend = {}
   for s in sdata:
     if s['name'] == station:
+      data = []
       data.append(getMeasure(s, 'PM1', 'pm1', 'ug/m3'))
       data.append(getMeasure(s, 'PM2.5', 'pm25', 'ug/m3'))
       data.append(getMeasure(s, 'PM10', 'pm10', 'ug/m3'))
@@ -91,10 +85,21 @@ def addStation(station, sdata):
       data.append(getMeasure(s, 'Geohash', 'geo', ''))
       data.append(getMeasure(s, 'Geohash3', 'geo3', ''))
       data.append(getMeasure(s, 'Version', 'rev', ''))
+      response['measurements'].append(data)
       fend = s
-      break
-  response['measurements'] = data
-  response['locations'] = getLocationInfo(fend) 
+      if unique:
+        break
+  return fend
+
+def addStation(station, sdata):
+  """ Add a station to API response
+  :param station: station name
+  :param sdata: all stations data
+  :return: station json data
+  """
+  response = getHeaderResponse(station) 
+  fend = getMeasurements(station, sdata, response)
+  getLocationInfo(fend, response)
   response['observedOn'] = fend['time'].format('YYYY-MM-DD HH:mm:ss')
   return response
 
@@ -105,10 +110,10 @@ class Station(Resource):
     stations = [station['distinct'] for station in rs.get_points()]
     abort_if_todo_doesnt_exist(stations, station_id)
     rs = client.query('select * from {} where "name"=\'{}\' AND (time >= now() - 1d)'.format(ftable, station_id))
-    response['rawdata'] = list(rs.get_points())
-    field = response['rawdata'][0]
-    response['locations'] = getLocationInfo(field)
-    response['observedOn'] = field['time'].format('YYYY-MM-DD HH:mm:ss')
+    sdata = list(rs.get_points())
+    fend = getMeasurements(station_id, sdata, response, False)
+    getLocationInfo(fend, response)
+    response['observedOn'] = fend['time'].format('YYYY-MM-DD HH:mm:ss')
     return response, 200 
 
 class Stations(Resource):
@@ -123,8 +128,8 @@ class Stations(Resource):
     return response, 200  # return data and 200 OK code
 
 
-api.add_resource(Stations, '/stations', '/stations/')
-api.add_resource(Station, '/stations/<string:station_id>')
+api.add_resource(Stations, '/stations', '/stations/', '/dwc/stations', '/dwc/stations/')
+api.add_resource(Station, '/stations/<string:station_id>', '/dwc/stations/<string:station_id>')
 
 if __name__ == '__main__':
   app.run(host="0.0.0.0")
