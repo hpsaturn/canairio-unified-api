@@ -2,3 +2,4 @@ Flask==2.0.3
 flask_restful==0.3.9
 influxdb==5.2.0
 pygeohash==1.2.0
+firebase-admin==5.2.0
