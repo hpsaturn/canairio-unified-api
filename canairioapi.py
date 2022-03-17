@@ -1,6 +1,8 @@
 from flask import Flask
 from flask_restful import Resource, Api, abort, reqparse
 from influxdb import InfluxDBClient
+import firebase_admin
+from firebase_admin import db
 import pygeohash as pgh
 import os
 
@@ -14,7 +16,14 @@ port = os.environ.get("CANAIRIO_INFLUX_PORT")
 dbname = os.environ.get("CANAIRIO_INFLUX_DBNAME")
 ftable = os.environ.get("CANAIRIO_INFLUX_FIXED_STATIONS_TABLE")
 
+cert = os.environ.get("CANAIRIO_FIREBASE_CERT")
+fpath = os.environ.get("CANAIRIO_FIREBASE_DBPATH")
+
 client = InfluxDBClient(host=host, port=port, database=dbname)
+# Firebase database init
+cred = firebase_admin.credentials.Certificate(cert)
+firebase_admin.initialize_app(cred, {'databaseURL': fpath})
+
 
 def abort_if_todo_doesnt_exist(stations, station_id):
     if station_id not in stations:
