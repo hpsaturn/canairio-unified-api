@@ -1,20 +1,33 @@
 from flask import Flask
 from flask_restful import Resource, Api, abort, reqparse
 from influxdb import InfluxDBClient
+import firebase_admin
+from firebase_admin import db
 import pygeohash as pgh
+import json
 import os
 
 app = Flask(__name__)
 api = Api(app)
 parser = reqparse.RequestParser()
 parser.add_argument('station_id')
+parser.add_argument('track_id')
 
 host = os.environ.get("CANAIRIO_INFLUX_HOST")
 port = os.environ.get("CANAIRIO_INFLUX_PORT")
 dbname = os.environ.get("CANAIRIO_INFLUX_DBNAME")
 ftable = os.environ.get("CANAIRIO_INFLUX_FIXED_STATIONS_TABLE")
 
+cert = os.environ.get("CANAIRIO_FIREBASE_CERT")
+fpath = os.environ.get("CANAIRIO_FIREBASE_DBPATH")
+tinfo = os.environ.get("CANAIRIO_FIREBASE_TINFO")
+tdata = os.environ.get("CANAIRIO_FIREBASE_TDATA")
+
 client = InfluxDBClient(host=host, port=port, database=dbname)
+# Firebase database init
+cred = firebase_admin.credentials.Certificate(cert)
+firebase_admin.initialize_app(cred, {'databaseURL': fpath})
+
 
 def abort_if_todo_doesnt_exist(stations, station_id):
     if station_id not in stations:
@@ -118,6 +131,17 @@ def addStation(station, sdata):
   return response
 
 
+class Stations(Resource):
+  def get(self):
+    response = []
+    rs = client.query('select distinct("name") from (select "name" from {} where time>now()-10m)'.format(ftable))
+    stations_names = [station['distinct'] for station in rs.get_points()]
+    rs = client.query('select * from {} where time>now()-10m'.format(ftable))
+    sdata = list(rs.get_points())
+    for station in stations_names:
+      response.append(addStation(station, sdata))
+    return response, 200  # return data and 200 OK code
+
 class Station(Resource):
   def get(self, station_id):
     response = getHeaderResponse(station_id)
@@ -132,20 +156,21 @@ class Station(Resource):
     return response, 200 
 
 
-class Stations(Resource):
+class Tracks(Resource):
   def get(self):
-    response = []
-    rs = client.query('select distinct("name") from (select "name" from {} where time>now()-10m)'.format(ftable))
-    stations_names = [station['distinct'] for station in rs.get_points()]
-    rs = client.query('select * from {} where time>now()-10m'.format(ftable))
-    sdata = list(rs.get_points())
-    for station in stations_names:
-      response.append(addStation(station, sdata))
-    return response, 200  # return data and 200 OK code
+    response = db.reference(tinfo).get()
+    return response, 200
+
+class Track(Resource):
+  def get(self, track_id):
+    response = db.reference(tdata+'/'+track_id).get()
+    return response, 200
 
 
 api.add_resource(Stations, '/stations', '/stations/', '/dwc/stations', '/dwc/stations/')
 api.add_resource(Station, '/stations/<string:station_id>', '/dwc/stations/<string:station_id>')
+api.add_resource(Tracks, '/tracks', '/tracks/')
+api.add_resource(Track, '/tracks/<string:track_id>')
 
 if __name__ == '__main__':
   app.run(host="0.0.0.0")
